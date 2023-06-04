@@ -1,12 +1,15 @@
 package propertybased
 
 import (
+	"errors"
 	"strings"
 )
 
-var bases [9]int = [9]int{1000, 900, 500, 400, 100, 90, 50, 40, 10}
+var ErrTooBigNumber = errors.New("maximum supported number is 3999")
 
-func ArabToRoman(n int) string {
+var bases [9]uint16 = [9]uint16{1000, 900, 500, 400, 100, 90, 50, 40, 10}
+
+func ArabToRoman(n uint16) string {
 	var roman strings.Builder
 	for _, part := range bases {
 		if n == 0 {
@@ -16,14 +19,14 @@ func ArabToRoman(n int) string {
 		if count > 0 {
 			n -= count * part
 			s := baseRoman(part)
-			roman.WriteString(strings.Repeat(s, count))
+			roman.WriteString(strings.Repeat(s, int(count)))
 		}
 	}
 	roman.WriteString(baseRoman(n))
 	return roman.String()
 }
 
-func baseRoman(n int) string {
+func baseRoman(n uint16) string {
 	switch n {
 	case 0:
 		return ""
@@ -68,8 +71,8 @@ func baseRoman(n int) string {
 	return ""
 }
 
-func RomanToArabic(s string) int {
-	var n int
+func RomanToArabic(s string) uint16 {
+	var n uint16
 	for i := 0; i < len(s); i++ {
 		currentSymbol := string(s[i])
 		currentValue := romanNumeralValue(currentSymbol)
@@ -85,7 +88,7 @@ func RomanToArabic(s string) int {
 	return n
 }
 
-func romanNumeralValue(symbol string) int {
+func romanNumeralValue(symbol string) uint16 {
 	switch symbol {
 	case "I":
 		return 1
@@ -106,12 +109,12 @@ func romanNumeralValue(symbol string) int {
 	}
 }
 
-func findParts(n, part int) int {
+func findParts(n, part uint16) uint16 {
 	return n / part
 }
 
-func RomanToArab(s string) int {
-	var n int
+func RomanToArab(s string) uint16 {
+	var n uint16
 	for _, numeral := range allRomanNumerals {
 		for strings.HasPrefix(s, numeral.Symbol) {
 			n += numeral.Value
@@ -122,13 +125,13 @@ func RomanToArab(s string) int {
 }
 
 type RomanNumeral struct {
-	Value  int
+	Value  uint16
 	Symbol string
 }
 
 type RomanNumerals []RomanNumeral
 
-func (numerals RomanNumerals) ValueOf(symbols ...byte) int {
+func (numerals RomanNumerals) ValueOf(symbols ...byte) uint16 {
 	roman := string(symbols)
 	for _, numeral := range numerals {
 		if numeral.Symbol == roman {
@@ -138,7 +141,58 @@ func (numerals RomanNumerals) ValueOf(symbols ...byte) int {
 	return 0
 }
 
-var allRomanNumerals = RomanNumerals{
+func ConvertToArabic(roman string) (n uint16) {
+	for _, symbols := range windowedRoman(roman).Symbols() {
+		n += allRomanNumerals.ValueOf(symbols...)
+	}
+	return
+}
+
+func ConvertToRoman(arabic uint16) (string, error) {
+	if arabic > 3999 {
+		return "", ErrTooBigNumber
+	}
+	var result strings.Builder
+
+	for _, numeral := range allRomanNumerals {
+		for arabic >= numeral.Value {
+			result.WriteString(numeral.Symbol)
+			arabic -= numeral.Value
+		}
+	}
+
+	return result.String(), nil
+}
+
+type romanNumeral struct {
+	Value  uint16
+	Symbol string
+}
+
+type romanNumerals []romanNumeral
+
+func (r romanNumerals) ValueOf(symbols ...byte) uint16 {
+	symbol := string(symbols)
+	for _, s := range r {
+		if s.Symbol == symbol {
+			return s.Value
+		}
+	}
+
+	return 0
+}
+
+func (r romanNumerals) Exists(symbols ...byte) bool {
+	symbol := string(symbols)
+	for _, s := range r {
+		if s.Symbol == symbol {
+			return true
+		}
+	}
+	return false
+}
+
+var allRomanNumerals = romanNumerals{
 	{1000, "M"},
 	{900, "CM"},
 	{500, "D"},
@@ -154,40 +208,14 @@ var allRomanNumerals = RomanNumerals{
 	{1, "I"},
 }
 
-func ConvertToRoman(n int) string {
-	var roman strings.Builder
-	for _, numeral := range allRomanNumerals {
-		for n >= numeral.Value {
-			roman.WriteString(numeral.Symbol)
-			n -= numeral.Value
-		}
-	}
-	return roman.String()
-}
-
-func ConvertToArabic(roman string) (n int) {
-	for _, symbols := range windowedRoman(roman).Symbols() {
-		n += allRomanNumerals.ValueOf(symbols...)
-	}
-	return
-}
-
-func (r RomanNumerals) Exists(symbols ...byte) bool {
-	symbol := string(symbols)
-	for _, numeral := range r {
-		if numeral.Symbol == symbol {
-			return true
-		}
-	}
-	return false
-}
-
 type windowedRoman string
 
 func (w windowedRoman) Symbols() (symbols [][]byte) {
 	for i := 0; i < len(w); i++ {
 		symbol := w[i]
-		if i+1 < len(w) && isSubtractive(symbol) && allRomanNumerals.Exists(symbol, w[i+1]) {
+		notAtEnd := i+1 < len(w)
+
+		if notAtEnd && isSubtractive(symbol) && allRomanNumerals.Exists(symbol, w[i+1]) {
 			symbols = append(symbols, []byte{symbol, w[i+1]})
 			i++
 		} else {

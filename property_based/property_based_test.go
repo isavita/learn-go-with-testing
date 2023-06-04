@@ -3,13 +3,14 @@ package propertybased
 import (
 	"fmt"
 	"testing"
+	"testing/quick"
 )
 
 // My personal implementation
 func TestArabToRoman(t *testing.T) {
 	cases := []struct {
 		Description string
-		Number      int
+		Number      uint16
 		Want        string
 	}{
 		{"converts 0 to ''", 0, ""},
@@ -42,7 +43,7 @@ func TestRomanToArab(t *testing.T) {
 	cases := []struct {
 		Description string
 		Number      string
-		Want        int
+		Want        uint16
 	}{
 		{"converts 0 to ''", "", 0},
 		{"converts 1 to 'I'", "I", 1},
@@ -73,7 +74,7 @@ func TestRomanToArab(t *testing.T) {
 }
 
 var cases = []struct {
-	Arabic int
+	Arabic uint16
 	Roman  string
 }{
 	{Arabic: 1, Roman: "I"},
@@ -105,17 +106,29 @@ var cases = []struct {
 	{Arabic: 2014, Roman: "MMXIV"},
 	{Arabic: 1006, Roman: "MVI"},
 	{Arabic: 798, Roman: "DCCXCVIII"},
+	{Arabic: 1999, Roman: "MCMXCIX"},
 }
 
 func TestConvertToRoman(t *testing.T) {
 	for _, test := range cases {
 		t.Run(fmt.Sprintf("%d gets converted to %q", test.Arabic, test.Roman), func(t *testing.T) {
-			got := ConvertToRoman(test.Arabic)
+			got, _ := ConvertToRoman(test.Arabic)
 			if got != test.Roman {
 				t.Errorf("got %q, want %q", got, test.Roman)
 			}
 		})
 	}
+
+	t.Run("errors when called with number greater than 3999", func(t *testing.T) {
+		_, err := ConvertToRoman(4000)
+		if err == nil {
+			t.Error("expected an error, but didn't get any")
+		}
+
+		if err != ErrTooBigNumber {
+			t.Errorf("got %q want %q", err, ErrTooBigNumber)
+		}
+	})
 }
 
 func TestConvertToArabic(t *testing.T) {
@@ -126,6 +139,22 @@ func TestConvertToArabic(t *testing.T) {
 				t.Errorf("got %d, want %d", got, test.Arabic)
 			}
 		})
+	}
+}
+
+func TestPropertiesOfConversion(t *testing.T) {
+	assertionFn := func(arabic uint16) bool {
+		if arabic > 3999 {
+			return true
+		}
+		t.Log("testing", arabic)
+		roman, _ := ConvertToRoman(arabic)
+		fromRoman := ConvertToArabic(roman)
+		return arabic == fromRoman
+	}
+
+	if err := quick.Check(assertionFn, nil); err != nil {
+		t.Error("failed checks", err)
 	}
 }
 
